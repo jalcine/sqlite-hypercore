@@ -42,6 +42,12 @@ impl IoMethods {
                 xFileControl: None,
                 xSectorSize: None,
                 xDeviceCharacteristics: None,
+                xFetch: None,
+                xShmBarrier: None,
+                xShmLock: None,
+                xShmMap: None,
+                xShmUnmap: None,
+                xUnfetch: None,
                 /*
                 FIXME: Define the following functions.
                    int (*xClose)(sqlite3_file*);
@@ -109,6 +115,10 @@ impl Vfs {
                     xGetLastError: None,
                     xRandomness: None,
                     xSleep: None,
+                    xCurrentTimeInt64: None,
+                    xGetSystemCall: None,
+                    xNextSystemCall: None,
+                    xSetSystemCall: None,
                     /*
                      * FIXME: Define the following functions.
                      * int (*xOpen)(sqlite3_vfs*, const char *zName, sqlite3_file*, int flags, int *pOutFlags);
@@ -151,8 +161,63 @@ impl Vfs {
     }
 }
 
+impl Drop for Vfs {
+    fn drop(&mut self) {
+        let result = unsafe { sqlite3::sqlite3_vfs_unregister(self.ptr()) };
+        if result != 0 {
+            panic!(
+                "What went wrong? sqlite3_vfs_unregister returned {}",
+                result
+            );
+        }
+    }
+}
+
 #[test]
 fn test_load_vfs_successful() {
     let fs = Vfs::new();
     assert!(fs.borrow().register().is_ok());
+}
+
+#[test]
+fn test_schema() {
+    let schema = r#"
+CREATE TABLE COMPANY (
+   ID INT PRIMARY KEY     NOT NULL,
+   NAME           TEXT    NOT NULL,
+   AGE            INT     NOT NULL,
+   ADDRESS        CHAR(50),
+   SALARY         REAL
+);
+
+INSERT INTO COMPANY (ID,NAME,AGE,ADDRESS,SALARY)
+VALUES (1, 'Paul', 32, 'California', 20000.00 );
+
+INSERT INTO COMPANY (ID,NAME,AGE,ADDRESS,SALARY)
+VALUES (2, 'Allen', 25, 'Texas', 15000.00 );
+
+INSERT INTO COMPANY (ID,NAME,AGE,ADDRESS,SALARY)
+VALUES (3, 'Teddy', 23, 'Norway', 20000.00 );
+
+INSERT INTO COMPANY (ID,NAME,AGE,ADDRESS,SALARY)
+VALUES (4, 'Mark', 25, 'Rich-Mond ', 65000.00 );
+
+INSERT INTO COMPANY (ID,NAME,AGE,ADDRESS,SALARY)
+VALUES (5, 'David', 27, 'Texas', 85000.00 );
+
+INSERT INTO COMPANY (ID,NAME,AGE,ADDRESS,SALARY)
+VALUES (6, 'Kim', 22, 'South-Hall', 45000.00 );
+    "#;
+    let fs = Vfs::new();
+    assert!(fs.borrow().register().is_ok());
+
+    let conn_result: rusqlite::Result<rusqlite::Connection> = rusqlite::Connection::open_with_flags(
+        "hyper://foo-network?vfs=hyper",
+        rusqlite::OpenFlags::SQLITE_OPEN_URI,
+    );
+
+    assert_eq!(conn_result.as_ref().err(), None);
+
+    let conn = conn_result.unwrap();
+    conn.execute(schema, rusqlite::params![]);
 }

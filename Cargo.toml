@@ -18,9 +18,9 @@ anyhow = "1.0.44"
 log = "0.4.14"
 libsqlite3-sys = "0.23.1"
 
-# [dependencies.rusqlite]
-# version = "0.26.0"
-# features = ["load_extension", "modern_sqlite"]
+[dependencies.rusqlite]
+version = "0.26.0"
+features = ["bundled"]
 # NOTE: Should we add 'hooks'?
 # NOTE: Should we add 'session'?
 # NOTE: Should we add 'backup'?

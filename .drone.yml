@@ -1,0 +1,14 @@
+---
+kind: pipeline
+type: docker
+name: Test
+
+steps:
+  - name: test
+    image: rust:1.50.0
+    commands:
+      - rustup component add rustfmt clippy
+      - cargo build
+      - cargo check
+      - cargo clippy
+      - cargo test
