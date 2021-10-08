@@ -1,4 +1,5 @@
 # SQLite and Hypercore
+[![Build Status](https://ci.jacky.wtf/api/badges/me/sqlite-hypercore/status.svg?ref=refs/heads/main)](https://ci.jacky.wtf/me/sqlite-hypercore)
 
 > A Rust library providing [SQLite][] with an [virtual file system][vfs] to enable
 > [Hypercore][] as a means of storage.
