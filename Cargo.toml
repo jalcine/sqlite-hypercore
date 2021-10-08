@@ -4,6 +4,7 @@ version = "0.0.1"
 edition = "2018"
 description = "Provides an extension to SQLite that allows for Hypercore to be used as a virtual file system (VFS)."
 repository = "https://git.jacky.wtf/me/sqlite-hypercore"
+license = "MIT or BSD-2-Clause"
 
 [features]
 default = []
