@@ -5,10 +5,11 @@ struct Vfs {
     reference: Box<sqlite3_vfs>,
 }
 
+/// This _should_ be where all of the logic for working with Hypercore and SQLite happen.
 impl Vfs {
     pub fn new() -> Rc<Vfs> {
         Rc::new(Vfs {
-            reference: Box::default(),
+            reference: Box::new(sqlite3_vfs {}),
         })
     }
 
