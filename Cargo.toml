@@ -11,16 +11,23 @@ default = []
 all = []
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 anyhow = "1.0.44"
 log = "0.4.14"
-libsqlite3-sys = "0.23.1"
+futures = "0.3"
+base64 = "0.13.0"
+async-std = {version = "1", features = ["attributes"]}
 
-[dependencies.rusqlite]
-version = "0.26.0"
-features = ["bundled"]
+# FIXME: When 'hypercore' stabilizies, pin to a minor version.
+hypercore = "0.11.1-beta.8"
+random-access-disk = "2.0.0"
+random-access-storage = "4.0.0"
+
+[dependencies.rusqlite-le]
+version = "0.24"
+# features = ["bundled"]
 # NOTE: Should we add 'hooks'?
 # NOTE: Should we add 'session'?
 # NOTE: Should we add 'backup'?

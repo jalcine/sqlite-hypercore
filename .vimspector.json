@@ -1,0 +1,30 @@
+{
+  "configurations": {
+    "launch": {
+      "adapter": "CodeLLDB",
+      "variables": {
+        "testBinaryPath": {
+          "shell": ".cargo/vimspector-get-test-binary.sh"
+        }
+      },
+      "configuration": {
+        "request": "launch",
+        "type": "lldb",
+        "sourceLanguages": ["rust", "c"],
+        "stopAtEntry": true,
+        "environment": {
+          "RUST_LOG": "trace",
+          "RUST_TEST_THREADS": 1
+        },
+        "program": "${testBinaryPath}",
+        "args": ["--nocapture"]
+      },
+      "breakpoints": {
+        "exception": {
+          "caught": "",
+          "uncaught": "Y"
+        }
+      }
+    }
+  }
+}
