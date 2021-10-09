@@ -153,7 +153,7 @@ impl HyperSQLite {
 #[async_std::test]
 async fn hypersqlite_open() {
     let _ = env_logger::builder().is_test(true).try_init();
-    let hs_result = HyperSQLite::open("test-open").await;
+    let hs_result = HyperSQLite::open("hypercore-data").await;
     assert!(hs_result.is_ok());
 
     let hs = hs_result.unwrap();
