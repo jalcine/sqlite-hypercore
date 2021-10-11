@@ -52,8 +52,8 @@ async fn main() -> anyhow::Result<()> {
 
 ## Licensing
 
-This project is dual-licensed under the (BSD 2)[./LICENSE.BSD-2] and (MIT)[./LICENSE.MIT].
-Just don't use it for things like (ICE)[https://www.ice.gov] or the like!
+This project is dual-licensed under the [BSD 2](./LICENSE.BSD-2) and [MIT](./LICENSE.MIT).
+Just don't use it for things like [ICE](https://www.ice.gov) or the like!
 
 [sqlite]: https://sqlite.org/index.html
 [vfs]: https://sqlite.org/vfs.html
