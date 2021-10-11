@@ -270,7 +270,7 @@ mod funcs {
     pub unsafe extern "C" fn resolve_full_path_name(
         ptr: *mut sqlite3_vfs,
         path_name: *const c_char,
-        null_terminator: c_int,
+        _null_terminator: c_int,
         resolved_path_name: *mut c_char,
     ) -> c_int {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -282,34 +282,26 @@ mod funcs {
             vfs_name
         );
 
-        let vfs_inst = (*ptr).pAppData as *mut Rc<RefCell<Instance>>;
+        // We need to get the VirtualFilesystem to call `full_pathname` on it.
 
-        let inst_ptr = (*vfs_inst).deref().borrow().obj();
-        let inst = inst_ptr.deref().borrow();
-
-        // This works as a passthrough.
-        if let Ok(resolved_path) = inst.full_pathname(path_name_str.to_str().unwrap()) {
-            log::trace!("Resolved {:?} into {:?}", path_name_str, resolved_path);
-            *resolved_path_name = resolved_path.into_bytes().as_ptr() as _;
-            SQLITE_OK as _
-        } else {
-            SQLITE_IOERR_ACCESS
-        }
+        // FIXME: This doesn't seem to be correct.
+        // let vfs_inst = (*ptr).pAppData as *mut Rc<RefCell<Instance>>;
+        SQLITE_OK as _
     }
     pub unsafe extern "C" fn delete_file(
-        ptr: *mut sqlite3_vfs,
-        path_name: *const c_char,
-        immediate: c_int,
+        _ptr: *mut sqlite3_vfs,
+        _path_name: *const c_char,
+        _immediate: c_int,
     ) -> c_int {
         let _ = env_logger::builder().is_test(true).try_init();
         log::trace!("Attempting to delete a file.");
         unimplemented!()
     }
     pub unsafe extern "C" fn get_file_access(
-        ptr: *mut sqlite3_vfs,
-        path_name: *const c_char,
-        flags: c_int,
-        resolved_access_flags: *mut c_int,
+        _ptr: *mut sqlite3_vfs,
+        _path_name: *const c_char,
+        _flags: c_int,
+        _resolved_access_flags: *mut c_int,
     ) -> c_int {
         let _ = env_logger::builder().is_test(true).try_init();
         log::trace!("Attempting to get file access info.");
@@ -318,14 +310,22 @@ mod funcs {
 
     pub unsafe extern "C" fn open_file(
         ptr: *mut sqlite3_vfs,
-        name: *const c_char,
-        file_ptr: *mut sqlite3_file,
-        flags: c_int,
-        output_flags: *mut c_int,
+        path_name: *const c_char,
+        _file_ptr: *mut sqlite3_file,
+        _flags: c_int,
+        _output_flags: *mut c_int,
     ) -> c_int {
         let _ = env_logger::builder().is_test(true).try_init();
-        log::trace!("Attempting to open a file.");
-        unimplemented!()
+        let vfs_name = CStr::from_ptr((*ptr).zName);
+        let path_name_str = CStr::from_ptr(path_name);
+
+        log::trace!(
+            "Attempting to open a file at {:?} via the {:?} VFS.",
+            path_name_str,
+            vfs_name
+        );
+
+        SQLITE_OK as _
     }
     pub unsafe extern "C" fn dl_open(
         _vfs: *mut sqlite3_vfs,
