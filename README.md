@@ -6,7 +6,7 @@
 
 ## Contributing
 
-The primary repository for this project is stored at [git.jacky.wtf][1] and mirrored to
+The primary repository for this project is stored at [git.jacky.wtf][] and mirrored to
 [github.com][]. You can use whichever code forge you'd prefer.
 
 ## Things to Do
