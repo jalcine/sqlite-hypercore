@@ -2,7 +2,7 @@
 use rusqlite::ffi::{self as sqlite3};
 use std::cell::RefCell;
 use std::ffi::{c_void, CString};
-use std::mem;
+use std::mem::{self, MaybeUninit};
 use std::ops::Deref;
 use std::os::raw;
 use std::ptr::NonNull;
@@ -173,55 +173,62 @@ pub trait VirtualFilesystem {
 
 pub struct Instance {
     name: CString,
-    ptr: std::ptr::NonNull<sqlite3::sqlite3_vfs>,
+    ptr: sqlite3::sqlite3_vfs,
+    fs_ptr: Rc<RefCell<dyn VirtualFilesystem + 'static>>,
 }
 
 impl Instance {
-    pub fn register(
+    pub fn obj(&self) -> Rc<RefCell<dyn VirtualFilesystem + 'static>> {
+        Rc::clone(&self.fs_ptr)
+    }
+
+    pub fn register<FS>(
         vfs_name: impl Into<Vec<u8>>,
-        _filesystem: impl VirtualFilesystem,
+        filesystem: FS,
         make_default: bool,
-    ) -> anyhow::Result<Rc<RefCell<Self>>> {
-        let mut vfs_ptr: mem::MaybeUninit<sqlite3::sqlite3_vfs> = mem::MaybeUninit::uninit();
+    ) -> anyhow::Result<Rc<RefCell<Self>>>
+    where
+        FS: Sized + VirtualFilesystem + 'static,
+    {
+        let mut vfs: sqlite3::sqlite3_vfs = unsafe { MaybeUninit::uninit().assume_init() };
         let inst = Rc::new(RefCell::new(Self {
             name: CString::new(vfs_name)?,
-            ptr: std::ptr::NonNull::new(vfs_ptr.as_mut_ptr())
-                .ok_or(anyhow::anyhow!("Failed to allocate pointer for SQLite VFS"))?,
+            ptr: vfs,
+            fs_ptr: Rc::new(RefCell::new(filesystem)),
         }));
 
         let file_ptr_size = mem::size_of::<Box<dyn VirtualFile>>() as raw::c_int;
 
-        let mut vfs = unsafe { inst.deref().borrow_mut().ptr.as_mut() };
+        let mut vfs_ptr = unsafe { &mut (*inst.as_ptr()).ptr };
 
-        vfs.iVersion = 1;
-        vfs.mxPathname = 1024;
-        vfs.zName = inst.deref().borrow().name.as_ptr() as _;
-        vfs.szOsFile = file_ptr_size;
-
-        vfs.pNext = std::ptr::null_mut();
-        // FIXME: We need to set this to be `inst` somehow.
-        vfs.pAppData = inst.as_ptr() as *mut c_void;
-
-        vfs.xOpen = Some(funcs::open_file);
-        vfs.xFullPathname = Some(funcs::resolve_full_path_name);
-        vfs.xAccess = Some(funcs::get_file_access);
-        vfs.xDelete = Some(funcs::delete_file);
-        vfs.xDlOpen = Some(funcs::dl_open);
-        vfs.xDlError = Some(funcs::dl_error);
-        vfs.xDlSym = Some(funcs::dl_sym);
-        vfs.xDlClose = Some(funcs::dl_close);
-        vfs.xRandomness = Some(funcs::randomness);
-        vfs.xSleep = Some(funcs::sleep);
-        vfs.xCurrentTime = Some(funcs::current_time);
-        vfs.xGetLastError = Some(funcs::get_last_error);
+        vfs.iVersion = 3;
+        vfs_ptr.mxPathname = 1024;
+        vfs_ptr.zName = inst.deref().borrow().name.as_ptr() as _;
+        vfs_ptr.szOsFile = file_ptr_size;
+        vfs_ptr.pNext = std::ptr::null_mut();
+        vfs_ptr.pAppData = inst.as_ptr() as *mut c_void;
+        vfs_ptr.xOpen = Some(funcs::open_file);
+        vfs_ptr.xFullPathname = Some(funcs::resolve_full_path_name);
+        vfs_ptr.xAccess = Some(funcs::get_file_access);
+        vfs_ptr.xDelete = Some(funcs::delete_file);
+        vfs_ptr.xDlOpen = Some(funcs::dl_open);
+        vfs_ptr.xDlError = Some(funcs::dl_error);
+        vfs_ptr.xDlSym = Some(funcs::dl_sym);
+        vfs_ptr.xDlClose = Some(funcs::dl_close);
+        vfs_ptr.xRandomness = Some(funcs::randomness);
+        vfs_ptr.xSleep = Some(funcs::sleep);
+        vfs_ptr.xCurrentTime = Some(funcs::current_time);
+        vfs_ptr.xGetLastError = Some(funcs::get_last_error);
 
         log::info!(
             "Attempting to register VFS for {:?}",
             inst.deref().borrow().name.clone()
         );
 
+        inst.deref().borrow_mut().ptr = *vfs_ptr;
+
         let register_result =
-            unsafe { sqlite3::sqlite3_vfs_register(vfs, make_default as raw::c_int) };
+            unsafe { sqlite3::sqlite3_vfs_register(vfs_ptr, make_default as raw::c_int) };
 
         if register_result == sqlite3::SQLITE_OK as _ {
             log::info!(
@@ -248,27 +255,17 @@ impl Instance {
     }
 }
 
-impl Drop for Instance {
-    fn drop(&mut self) {
-        log::debug!("Dropping the VFS named {:?}", self.name.clone());
-        let unregister_result = unsafe { sqlite3::sqlite3_vfs_unregister(self.ptr.as_mut()) };
-        if unregister_result == sqlite3::SQLITE_OK as _ {
-            log::debug!("Successfully unregistered VFS {:?}", self.name.clone());
-        }
-        log::debug!(
-            "The VFS dropping of {:?} resulted in {:?}",
-            self.name.clone(),
-            unregister_result
-        );
-    }
-}
-
 mod funcs {
-    use std::ffi::c_void;
+    use std::cell::RefCell;
+    use std::ffi::{c_void, CStr};
     use std::mem::zeroed;
+    use std::ops::Deref;
     use std::os::raw::{c_char, c_double, c_int, c_schar};
+    use std::rc::Rc;
 
-    use rusqlite::ffi::{sqlite3_file, sqlite3_vfs, SQLITE_OK};
+    use rusqlite::ffi::{sqlite3_file, sqlite3_vfs, SQLITE_IOERR_ACCESS, SQLITE_OK};
+
+    use crate::vfs::Instance;
 
     pub unsafe extern "C" fn resolve_full_path_name(
         ptr: *mut sqlite3_vfs,
@@ -277,8 +274,27 @@ mod funcs {
         resolved_path_name: *mut c_char,
     ) -> c_int {
         let _ = env_logger::builder().is_test(true).try_init();
-        log::trace!("Attempting to resolve the full path name.");
-        unimplemented!()
+        let vfs_name = CStr::from_ptr((*ptr).zName);
+        let path_name_str = CStr::from_ptr(path_name);
+        log::trace!(
+            "Attempting to resolve the full path name of {:?} from {:?}.",
+            path_name_str,
+            vfs_name
+        );
+
+        let vfs_inst = (*ptr).pAppData as *mut Rc<RefCell<Instance>>;
+
+        let inst_ptr = (*vfs_inst).deref().borrow().obj();
+        let inst = inst_ptr.deref().borrow();
+
+        // This works as a passthrough.
+        if let Ok(resolved_path) = inst.full_pathname(path_name_str.to_str().unwrap()) {
+            log::trace!("Resolved {:?} into {:?}", path_name_str, resolved_path);
+            *resolved_path_name = resolved_path.into_bytes().as_ptr() as _;
+            SQLITE_OK as _
+        } else {
+            SQLITE_IOERR_ACCESS
+        }
     }
     pub unsafe extern "C" fn delete_file(
         ptr: *mut sqlite3_vfs,
@@ -436,7 +452,7 @@ mod test {
                 name TEXT
             );
         "#,
-                [],
+                rusqlite::NO_PARAMS,
             )
             .is_ok());
 

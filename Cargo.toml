@@ -26,7 +26,7 @@ env_logger = "0.9.0"
 # random-access-disk = "2.0.0"
 # random-access-storage = "4.0.0"
 
-[dependencies.rusqlite-le]
+[dependencies.rusqlite]
 version = "0.24"
 features = ["bundled"]
 # NOTE: Should we add 'hooks'?
