@@ -9,6 +9,8 @@
 The primary repository for this project is stored at [git.jacky.wtf][] and mirrored to
 [github.com][]. You can use whichever code forge you'd prefer.
 
+> It is recommended to always use [cargo-crev](https://github.com/crev-dev/cargo-crev) to verify the trustworthiness of each of your dependencies, including this one.
+
 ## Things to Do
 
 - [ ] Complete the wrapper over `sqlite3_vfs` in [`sqlite_hypercore::vfs`](./src/vfs/mod.rs).
