@@ -4,7 +4,7 @@
       "adapter": "CodeLLDB",
       "variables": {
         "testBinaryPath": {
-          "shell": ".cargo/vimspector-get-test-binary.sh"
+          "shell": "${workspaceRoot}/.cargo/vimspector-get-test-binary.sh"
         }
       },
       "configuration": {
